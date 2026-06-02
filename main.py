@@ -1,4 +1,5 @@
 from playwright.sync_api import sync_playwright
+import re
 
 
 def main() -> None:
@@ -17,7 +18,7 @@ def main() -> None:
         page.get_by_role("button", name="Entrar").click()
 
         page.get_by_test_id("skip-mfa").click()
-        
+
         page.locator("#meu_curso").click()
         page.get_by_role("presentation", name="Disciplina e notas").click()
 
@@ -53,6 +54,23 @@ def main() -> None:
             ).click()
         else:
             print("Nenhuma materia encontrada.")
+
+        unidades_para_fazer = page.get_by_text(
+            re.compile(r"Unidade de ensino \d")
+        ).all()
+
+        # _ é convenção para "não preciso dessa var"
+        for i, _ in enumerate(unidades_para_fazer, start=1):
+            lista_de_secoes=page.get_by_text(re.compile(fr"U{i} - Seção \w+")).all() 
+            for secao in lista_de_secoes: 
+                page.get_by_text(f"{secao}").click()
+
+                atividades_vale_ponto= page.locator("#icon-library_books").all()
+                for ativs in atividades_vale_ponto:
+                    #Aqui vou iniciar uma nova pagina, esperar a IA responder (cp e cola o texto com alternativas) 
+                    # e apertar o botão proximo(fazer caso base "click finalizar tarefa")
+            #Aqui vai a logica da resolução de exercícios 
+            
 
 
 if __name__ == "__main__":
