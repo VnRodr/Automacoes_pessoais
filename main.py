@@ -8,6 +8,10 @@ def main() -> None:
 
     with sync_playwright() as playwright:
         browser = playwright.firefox.launch(headless=False)
+        pag_IA = playwright.firefox.launch()
+
+        IA_web = pag_IA.new_page()
+
         page = browser.new_page()
         page.goto("https://login.anhanguera.com/", wait_until="domcontentloaded")
 
@@ -59,19 +63,52 @@ def main() -> None:
             re.compile(r"Unidade de ensino \d")
         ).all()
 
+        IA_web.goto("https://chatgpt.com/")
         # _ é convenção para "não preciso dessa var"
         for i, _ in enumerate(unidades_para_fazer, start=1):
-            lista_de_secoes=page.get_by_text(re.compile(fr"U{i} - Seção \w+")).all() 
-            for secao in lista_de_secoes: 
+            lista_de_secoes = page.get_by_text(re.compile(rf"U{i} - Seção \w+")).all()
+            for secao in lista_de_secoes:
                 page.get_by_text(f"{secao}").click()
 
-                atividades_vale_ponto= page.locator("#icon-library_books").all()
-                for ativs in atividades_vale_ponto:
-                    #Aqui vou iniciar uma nova pagina, esperar a IA responder (cp e cola o texto com alternativas) 
-                    # e apertar o botão proximo(fazer caso base "click finalizar tarefa")
-            #Aqui vai a logica da resolução de exercícios 
-            
+                atividades_vale_ponto = (
+                    page.locator("#ct-list")
+                    .filter(
+                        has=page.locator("#icon_library_books")
+                        and page.locator("#icon-new_releases")
+                    )
+                    .all()
+                )
+                #fazer um while para percorrer a ativadade toda (aqui so faz 1 questao por vez)
+                for atividade in atividades_vale_ponto:
+                    atividade.locator("a").click()
+                    page.get_by_role(
+                        "button", description="questionário", exact=False
+                    ).click()
 
+                    text = page.locator("#qtext").inner_text()
 
+                    IA_web.get_by_text("Ask anything").click()
+                    IA_web.get_by_text("Ask anything").type(
+                        "\n".join(text)
+                        + "\nDê apenas a resposta, ele de ser a letra da questão com um ponto seguido do texto da alternativa"
+                        + "\nEx: |a.texto da questão. Note que a '|' deve ser sempre posta do lado da alternativa(letra), "
+                        + "a alternativa deve estar com letra minúscula"
+                    )
+
+                    resposta = IA_web.get_by_text(re.compile(r"\|[abcde]."))
+                    resposta.wait_for(state='attached')
+                    resposta = re.search(r"[abcde]\.", resposta.inner_text())
+                    
+                    letra = ""
+                    if resposta is not None:
+                        letra = resposta.group()
+                        page.get_by_role("radio").filter(has_text=letra).click()
+                    else:
+                       print("Nenhuma letra encontrada")
+
+                    #fazer algum tipo de validação para ver se deu certo mesmo depois.
+                    page.get_by_role("radio").filter(has_text=letra).click()
+
+                    page.locator("#submitbtns").get_by_role("button").filter(has=page.locator("[valor='Próxima página']")).click()
 if __name__ == "__main__":
     main()
